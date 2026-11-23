@@ -341,9 +341,11 @@ button { -webkit-tap-highlight-color: transparent; }
   animation: ping 2.6s var(--ease-out) infinite;
 }
 .model[data-remote="true"] .model-dot { background: var(--handover); }
+.model[data-remote="offline"] .model-dot { background: var(--ignore); }
+.model[data-remote="offline"] .model-dot::after { animation: none; opacity: 0; }
 .model-kind { font-weight: 600; }
 .model-id {
-  max-width: 24ch;
+  max-width: 34ch;
   overflow: hidden;
   text-overflow: ellipsis;
   font: 500 11px/1.2 var(--font-mono);

@@ -373,17 +373,32 @@
     els.channelChip.textContent = d.context.channel;
     els.company.textContent = d.context.company;
 
-    let local = true;
-    try {
-      local = ["127.0.0.1", "localhost", "[::1]", "0.0.0.0"].includes(new URL(d.baseUrl).hostname);
-    } catch {
-      local = true;
+    if (!d.modelId || !d.baseUrl) {
+      els.model.hidden = false;
+      els.model.dataset.remote = "offline";
+      els.model.title = d.runtimeError || "No local model server or OPENROUTER_API_KEY configured.";
+      els.modelKind.textContent = "Read-only";
+      els.modelId.textContent = "No model";
+    } else {
+      let local = true;
+      try {
+        local = ["127.0.0.1", "localhost", "[::1]", "0.0.0.0"].includes(new URL(d.baseUrl).hostname);
+      } catch {
+        local = true;
+      }
+      els.model.hidden = false;
+      els.model.dataset.remote = String(!local);
+      if (d.isOpenRouter || (!local && String(d.baseUrl).includes("openrouter.ai"))) {
+        const pin = d.openRouterProvider ? ` (${d.openRouterProvider})` : "";
+        els.modelKind.textContent = d.fallbackFromLocal ? "OpenRouter fallback" : "OpenRouter";
+        els.modelId.textContent = d.modelId;
+        els.model.title = `${d.fallbackFromLocal ? "Local API unavailable — fell back to OpenRouter" : "OpenRouter"}${pin} · ${d.baseUrl}`;
+      } else {
+        els.modelKind.textContent = local ? "Local model" : "Remote model";
+        els.modelId.textContent = d.modelId;
+        els.model.title = `Model endpoint: ${d.baseUrl}`;
+      }
     }
-    els.model.hidden = false;
-    els.model.dataset.remote = String(!local);
-    els.model.title = `Model endpoint: ${d.baseUrl}`;
-    els.modelKind.textContent = local ? "Local model" : "Remote model";
-    els.modelId.textContent = d.modelId;
     els.replayLabel.textContent = d.messages.length ? `Re-run all ${d.messages.length}` : "Re-run all";
   }
 
@@ -1148,10 +1163,12 @@
         body: JSON.stringify(message),
       });
       state.pending = null;
+      if (res.model) Object.assign(state.data, res.model);
       state.data.entries.push(res.entry);
       state.data.tickets = res.tickets;
       state.selectedId = res.entry.message.id;
       state.tab = "decision";
+      renderStatus();
       syncTabs();
       renderLegend();
       renderFeed({ resolveId: res.entry.message.id });

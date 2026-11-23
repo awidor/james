@@ -23,13 +23,13 @@ interface HistoryEntry {
 
 export class JamesSession {
   readonly context: ChallengeContext;
-  readonly runtime: ResolvedLocalRuntime;
+  runtime: ResolvedLocalRuntime | null;
   readonly liveTickets: LiveTicket[];
   readonly history: HistoryEntry[] = [];
   private nextIncNumber: number;
   private nextSrNumber = 1001;
 
-  constructor(context: ChallengeContext, runtime: ResolvedLocalRuntime) {
+  constructor(context: ChallengeContext, runtime: ResolvedLocalRuntime | null) {
     this.context = context;
     this.runtime = runtime;
     this.liveTickets = context.known_incidents.map((inc) => ({
@@ -50,6 +50,10 @@ export class JamesSession {
       return m ? Math.max(max, Number(m[1])) : max;
     }, 4711);
     this.nextIncNumber = maxInc + 1;
+  }
+
+  setRuntime(runtime: ResolvedLocalRuntime | null): void {
+    this.runtime = runtime;
   }
 
   private allocateTicketId(type: TicketType): string {
@@ -151,8 +155,15 @@ Decide how James should react to message #${msg.id} and call the appropriate dec
         preGuard,
         trace,
         durationMs: Date.now() - startedAt,
-        modelId: this.runtime.modelId,
+        modelId: this.runtime?.modelId ?? "pre-guard",
       };
+    }
+
+    const runtime = this.runtime;
+    if (!runtime) {
+      throw new Error(
+        "No model runtime is connected. Start a local model server on http://127.0.0.1:8080/v1 or set OPENROUTER_API_KEY in .env.",
+      );
     }
 
     const committedDecisions: DecisionOutput[] = [];
@@ -186,11 +197,11 @@ Decide how James should react to message #${msg.id} and call the appropriate dec
     const agent = new Agent({
       initialState: {
         systemPrompt: buildSystemPrompt(this.context, this.liveTickets),
-        model: this.runtime.model,
+        model: runtime.model,
         tools,
         thinkingLevel: "off",
       },
-      streamFn: this.runtime.models.streamSimple.bind(this.runtime.models),
+      streamFn: runtime.models.streamSimple.bind(runtime.models),
       toolExecution: "sequential",
       beforeToolCall,
       finishTurn: async (turn) => {
@@ -328,7 +339,7 @@ Decide how James should react to message #${msg.id} and call the appropriate dec
       createdTicketId,
       updatedTicketId,
       durationMs: Date.now() - startedAt,
-      modelId: this.runtime.modelId,
+      modelId: runtime.modelId,
     };
   }
 }

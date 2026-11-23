@@ -1,10 +1,19 @@
 import { createModels, createProvider, type Model, type Models } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 
+export const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:8080/v1";
+export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+export const DEFAULT_OPENROUTER_MODEL = "thinkingmachines/inkling-2-mini";
+export const DEFAULT_OPENROUTER_PROVIDER = "primeintellect";
+
 export interface LocalProviderConfig {
   baseUrl: string;
   modelId?: string;
   apiKey?: string;
+  fallbackToOpenRouter?: boolean;
+  openRouterModelId?: string;
+  openRouterProvider?: string;
+  openRouterApiKey?: string;
 }
 
 export interface ResolvedLocalRuntime {
@@ -12,6 +21,9 @@ export interface ResolvedLocalRuntime {
   model: Model<"openai-completions">;
   baseUrl: string;
   modelId: string;
+  isOpenRouter: boolean;
+  openRouterProvider?: string;
+  fallbackFromLocal?: boolean;
 }
 
 interface OpenAIModelsList {
@@ -60,11 +72,12 @@ async function discoverOpenRouterLimits(
       const endpoints = payload.data?.endpoints ?? [];
       const match =
         (preferredProvider
-          ? endpoints.find(
-              (e) =>
-                e.provider_name?.toLowerCase() === preferredProvider.toLowerCase() ||
-                e.tag?.toLowerCase() === preferredProvider.toLowerCase(),
-            )
+          ? endpoints.find((e) => {
+              const want = preferredProvider.toLowerCase();
+              const name = e.provider_name?.toLowerCase();
+              const tag = e.tag?.toLowerCase();
+              return name === want || tag === want || Boolean(tag?.startsWith(`${want}/`));
+            })
           : undefined) ?? endpoints[0];
       if (match) {
         return {
@@ -79,10 +92,30 @@ async function discoverOpenRouterLimits(
   return { contextWindow: 1048576, maxTokens: 65536 };
 }
 
+export async function isLocalApiReachable(
+  baseUrl: string,
+  apiKey?: string,
+): Promise<boolean> {
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  try {
+    const res = await fetch(`${baseUrl}/models`, {
+      headers,
+      signal: AbortSignal.timeout(2500),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function discoverLocalModel(
   baseUrl: string,
   preferredModelId?: string,
   apiKey?: string,
+  options?: { requireReachable?: boolean },
 ): Promise<{ id: string; contextWindow: number; maxTokens: number }> {
   const headers: Record<string, string> = {};
   if (apiKey) {
@@ -93,10 +126,10 @@ async function discoverLocalModel(
   try {
     res = await fetch(`${baseUrl}/models`, {
       headers,
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(options?.requireReachable ? 2500 : 5000),
     });
   } catch (err) {
-    if (preferredModelId) {
+    if (preferredModelId && !options?.requireReachable) {
       return { id: preferredModelId, contextWindow: 32768, maxTokens: 32768 };
     }
     throw new Error(
@@ -105,7 +138,7 @@ async function discoverLocalModel(
   }
 
   if (!res.ok) {
-    if (preferredModelId) {
+    if (preferredModelId && !options?.requireReachable) {
       return { id: preferredModelId, contextWindow: 32768, maxTokens: 32768 };
     }
     throw new Error(`Local API ${baseUrl}/models returned HTTP ${res.status}`);
@@ -147,39 +180,16 @@ async function discoverLocalModel(
   return { id: first.id, contextWindow, maxTokens };
 }
 
-/**
- * Connects Pi AI to an OpenAI-compatible API (default: offline http://127.0.0.1:8080/v1).
- * Intentionally does NOT pass temperature or JSON grammar constraints.
- */
-export async function createLocalRuntime(
-  overrides?: Partial<LocalProviderConfig>,
-): Promise<ResolvedLocalRuntime> {
-  try {
-    process.loadEnvFile();
-  } catch {
-    // No .env file present — completely normal for offline runs.
-  }
-
-  const baseUrl = normalizeBaseUrl(
-    overrides?.baseUrl ?? process.env.JAMES_API_BASE_URL ?? "http://127.0.0.1:8080/v1",
-  );
-  const isOpenRouter = baseUrl.includes("openrouter.ai");
-  const apiKey =
-    overrides?.apiKey ??
-    process.env.JAMES_API_KEY ??
-    (isOpenRouter ? process.env.OPENROUTER_API_KEY : undefined) ??
-    "";
-  const preferredModelId = overrides?.modelId ?? process.env.JAMES_MODEL;
-
-  const openRouterProvider = process.env.JAMES_OPENROUTER_PROVIDER?.trim();
-
-  const discovered =
-    isOpenRouter && preferredModelId
-      ? {
-          id: preferredModelId,
-          ...(await discoverOpenRouterLimits(baseUrl, preferredModelId, openRouterProvider)),
-        }
-      : await discoverLocalModel(baseUrl, preferredModelId, apiKey || undefined);
+function buildRuntime(params: {
+  baseUrl: string;
+  apiKey: string;
+  discovered: { id: string; contextWindow: number; maxTokens: number };
+  isOpenRouter: boolean;
+  openRouterProvider?: string;
+  fallbackFromLocal?: boolean;
+}): ResolvedLocalRuntime {
+  const { baseUrl, apiKey, discovered, isOpenRouter, openRouterProvider, fallbackFromLocal } =
+    params;
 
   const localModel: Model<"openai-completions"> = {
     id: discovered.id,
@@ -203,6 +213,7 @@ export async function createLocalRuntime(
             openRouterRouting: {
               only: [openRouterProvider],
               order: [openRouterProvider],
+              allow_fallbacks: false,
             },
           }
         : {}),
@@ -211,11 +222,11 @@ export async function createLocalRuntime(
 
   const provider = createProvider({
     id: "local",
-    name: "Local OpenAI-Compatible API",
+    name: isOpenRouter ? "OpenRouter" : "Local OpenAI-Compatible API",
     baseUrl,
     auth: {
       apiKey: {
-        name: "Local",
+        name: isOpenRouter ? "OpenRouter" : "Local",
         resolve: async () => ({
           auth: { apiKey: apiKey || "local" },
         }),
@@ -234,5 +245,129 @@ export async function createLocalRuntime(
     model,
     baseUrl,
     modelId: discovered.id,
+    isOpenRouter,
+    openRouterProvider: isOpenRouter && openRouterProvider ? openRouterProvider : undefined,
+    fallbackFromLocal: Boolean(fallbackFromLocal),
   };
+}
+
+function resolveOpenRouterProviderPin(
+  modelId: string,
+  configuredProvider?: string,
+): string | undefined {
+  if (configuredProvider !== undefined) {
+    const trimmed = configuredProvider.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  return modelId === DEFAULT_OPENROUTER_MODEL ? DEFAULT_OPENROUTER_PROVIDER : undefined;
+}
+
+/**
+ * Connects Pi AI to an OpenAI-compatible API (default: offline http://127.0.0.1:8080/v1).
+ * When `fallbackToOpenRouter` is enabled and the local API is unreachable, falls back
+ * to OpenRouter (`thinkingmachines/inkling-2-mini`, pinned to `primeintellect`) using
+ * `OPENROUTER_API_KEY`.
+ * Intentionally does NOT pass temperature or JSON grammar constraints.
+ */
+export async function createLocalRuntime(
+  overrides?: Partial<LocalProviderConfig>,
+): Promise<ResolvedLocalRuntime> {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // No .env file present — completely normal for offline runs.
+  }
+
+  const baseUrl = normalizeBaseUrl(
+    overrides?.baseUrl ?? process.env.JAMES_API_BASE_URL ?? DEFAULT_LOCAL_BASE_URL,
+  );
+  const isOpenRouter = baseUrl.includes("openrouter.ai");
+  const preferredModelId = overrides?.modelId ?? process.env.JAMES_MODEL;
+  const openRouterProviderConfig =
+    overrides?.openRouterProvider ?? process.env.JAMES_OPENROUTER_PROVIDER;
+
+  if (isOpenRouter) {
+    const apiKey = (
+      overrides?.apiKey ??
+      overrides?.openRouterApiKey ??
+      process.env.JAMES_API_KEY ??
+      process.env.OPENROUTER_API_KEY ??
+      ""
+    ).trim();
+    if (!apiKey) {
+      throw new Error(
+        "OpenRouter API key is missing. Set OPENROUTER_API_KEY in .env or JAMES_API_KEY in your environment.",
+      );
+    }
+    const modelId =
+      preferredModelId?.trim() ||
+      overrides?.openRouterModelId?.trim() ||
+      process.env.JAMES_OPENROUTER_MODEL?.trim() ||
+      DEFAULT_OPENROUTER_MODEL;
+    const pinnedProvider = resolveOpenRouterProviderPin(modelId, openRouterProviderConfig);
+    const limits = await discoverOpenRouterLimits(baseUrl, modelId, pinnedProvider);
+    return buildRuntime({
+      baseUrl,
+      apiKey,
+      discovered: { id: modelId, ...limits },
+      isOpenRouter: true,
+      openRouterProvider: pinnedProvider,
+      fallbackFromLocal: false,
+    });
+  }
+
+  const localApiKey = (overrides?.apiKey ?? process.env.JAMES_API_KEY ?? "").trim();
+
+  try {
+    const discovered = await discoverLocalModel(baseUrl, preferredModelId, localApiKey || undefined, {
+      requireReachable: Boolean(overrides?.fallbackToOpenRouter),
+    });
+    return buildRuntime({
+      baseUrl,
+      apiKey: localApiKey,
+      discovered,
+      isOpenRouter: false,
+      fallbackFromLocal: false,
+    });
+  } catch (localErr) {
+    if (!overrides?.fallbackToOpenRouter) {
+      throw localErr;
+    }
+
+    const openRouterApiKey = (
+      overrides?.openRouterApiKey ??
+      process.env.OPENROUTER_API_KEY ??
+      ""
+    ).trim();
+    if (!openRouterApiKey) {
+      const localReason = localErr instanceof Error ? localErr.message : String(localErr);
+      throw new Error(
+        `${localReason} OpenRouter fallback is unavailable because OPENROUTER_API_KEY is not set.`,
+      );
+    }
+
+    const fallbackModelId =
+      overrides?.openRouterModelId?.trim() ||
+      process.env.JAMES_OPENROUTER_MODEL?.trim() ||
+      (preferredModelId && preferredModelId.includes("/") ? preferredModelId.trim() : "") ||
+      DEFAULT_OPENROUTER_MODEL;
+    const pinnedProvider = resolveOpenRouterProviderPin(
+      fallbackModelId,
+      openRouterProviderConfig,
+    );
+    const limits = await discoverOpenRouterLimits(
+      OPENROUTER_BASE_URL,
+      fallbackModelId,
+      pinnedProvider,
+    );
+
+    return buildRuntime({
+      baseUrl: OPENROUTER_BASE_URL,
+      apiKey: openRouterApiKey,
+      discovered: { id: fallbackModelId, ...limits },
+      isOpenRouter: true,
+      openRouterProvider: pinnedProvider,
+      fallbackFromLocal: true,
+    });
+  }
 }

@@ -25,7 +25,7 @@ node tests/run-tests.ts
 node src/server.ts
 ```
 
-Then open `http://127.0.0.1:3000` in your browser. The UI is plain HTML/CSS/JS with fonts bundled in `frontend/fonts`, so it needs no build step and no internet.
+Then open `http://127.0.0.1:3000` in your browser. The UI is plain HTML/CSS/JS with fonts bundled in `frontend/fonts`, so it needs no build step and no internet. If no local model API is running on `http://127.0.0.1:8080/v1`, the UI server automatically falls back to OpenRouter (`thinkingmachines/inkling-2-mini`, pinned to `primeintellect`) using `OPENROUTER_API_KEY` from `.env` (or opens in read-only mode to inspect the saved run if no key is set).
 
 What happens when you click:
 
@@ -47,7 +47,7 @@ Defined in [`src/rules.ts`](src/rules.ts) and hard-checked where objectively ver
 
 ## How AI Was Used (and Where It Was Wrong)
 
-I used an AI coding assistant to plan the architecture, scaffold the Pi Agent tool/guardrail integration, and vibe-code the local HTML frontend. The AI was wrong twice along the way: first, it initially proposed a pure deterministic rule engine with regex guards over natural language (which would have failed on unseen messages in the live call), and later it added a generic policy phrase mentioning `"human owner"` that collided with `"data owner"` in `KB-01` and caused James to misclassify Dr. Weber's Board escalation (#4) as an access request. Catching those mistakes led to the cleaner split used here: a real tool-calling Pi Agent for natural-language judgment, backed only by hard, objectively verifiable code guards.
+I used **Gemini 4 Neon** for discussion and overall implementation, and **Fable 5.2** for the local HTML frontend. On the actual AI architecture, though, Gemini 4 Neon got almost everything wrong and had to be corrected: it first suggested using Ollama with an outdated GGUF model, then proposed building a custom Python harness instead of running James agentically, and repeatedly tried to do deterministic rules and rewrites over natural language (which makes no sense for unseen messages). Overriding those suggestions led to the cleaner split used here: a real tool-calling Pi Agent over a local OpenAI-compatible endpoint for natural-language judgment, backed only by hard, objectively verifiable code guards.
 
 ## Project Layout
 

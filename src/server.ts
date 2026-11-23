@@ -2,7 +2,11 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { JamesSession } from "./agent.ts";
-import { createLocalRuntime, type ResolvedLocalRuntime } from "./provider.ts";
+import {
+  createLocalRuntime,
+  isLocalApiReachable,
+  type ResolvedLocalRuntime,
+} from "./provider.ts";
 import { NEVER_BREAK_RULES } from "./rules.ts";
 import type {
   ChallengeInput,
@@ -35,7 +39,8 @@ interface UiEntry {
 
 class LocalDemoState {
   challenge!: ChallengeInput;
-  runtime!: ResolvedLocalRuntime;
+  runtime: ResolvedLocalRuntime | null = null;
+  runtimeError: string | null = null;
   session!: JamesSession;
   entries: UiEntry[] = [];
   nextMessageId = 9;
@@ -43,8 +48,50 @@ class LocalDemoState {
   async init(): Promise<void> {
     const raw = await readFile(path.resolve("james-challenge.json"), "utf8");
     this.challenge = JSON.parse(raw) as ChallengeInput;
-    this.runtime = await createLocalRuntime();
+    await this.resolveRuntime();
     await this.loadBaseline();
+  }
+
+  async resolveRuntime(): Promise<ResolvedLocalRuntime | null> {
+    try {
+      this.runtime = await createLocalRuntime({ fallbackToOpenRouter: true });
+      this.runtimeError = null;
+      this.session?.setRuntime(this.runtime);
+      return this.runtime;
+    } catch (err) {
+      this.runtime = null;
+      this.runtimeError = err instanceof Error ? err.message : String(err);
+      this.session?.setRuntime(null);
+      return null;
+    }
+  }
+
+  async ensureRuntime(): Promise<ResolvedLocalRuntime> {
+    if (this.runtime && !this.runtime.isOpenRouter) {
+      const reachable = await isLocalApiReachable(
+        this.runtime.baseUrl,
+        process.env.JAMES_API_KEY?.trim() || undefined,
+      );
+      if (!reachable) {
+        console.warn(
+          `Local model API at ${this.runtime.baseUrl} is no longer reachable; attempting OpenRouter fallback...`,
+        );
+        await this.resolveRuntime();
+      }
+    }
+
+    if (!this.runtime) {
+      await this.resolveRuntime();
+    }
+
+    if (!this.runtime) {
+      throw new Error(
+        this.runtimeError ??
+          "No model runtime is connected. Start a local model server or set OPENROUTER_API_KEY in .env.",
+      );
+    }
+
+    return this.runtime;
   }
 
   async loadBaseline(): Promise<void> {
@@ -145,6 +192,7 @@ class LocalDemoState {
     time: string;
     text: string;
   }): Promise<UiEntry> {
+    await this.ensureRuntime();
     const msg: ChannelMessage = {
       id: this.nextMessageId++,
       from: payload.from.trim() || "Alex Weber",
@@ -168,7 +216,8 @@ class LocalDemoState {
   }
 
   async replayAll(): Promise<void> {
-    this.session = new JamesSession(this.challenge.context, this.runtime);
+    const runtime = await this.ensureRuntime();
+    this.session = new JamesSession(this.challenge.context, runtime);
     this.entries = [];
     const results: DecisionWithTrace[] = [];
 
@@ -200,11 +249,21 @@ class LocalDemoState {
       this.challenge.messages.reduce((m, x) => Math.max(m, x.id), 0) + 1;
   }
 
+  modelInfo() {
+    return {
+      modelId: this.runtime?.modelId ?? null,
+      baseUrl: this.runtime?.baseUrl ?? null,
+      isOpenRouter: this.runtime?.isOpenRouter ?? false,
+      openRouterProvider: this.runtime?.openRouterProvider ?? null,
+      fallbackFromLocal: this.runtime?.fallbackFromLocal ?? false,
+      runtimeError: this.runtimeError,
+    };
+  }
+
   snapshot() {
     return {
       context: this.challenge.context,
-      modelId: this.runtime.modelId,
-      baseUrl: this.runtime.baseUrl,
+      ...this.modelInfo(),
       rules: NEVER_BREAK_RULES,
       messages: this.challenge.messages,
       entries: this.entries,
@@ -285,7 +344,11 @@ async function main(): Promise<void> {
           time: String(body.time ?? "Mon 10:30"),
           text,
         });
-        sendJson(res, 200, { entry, tickets: state.session.liveTickets });
+        sendJson(res, 200, {
+          entry,
+          tickets: state.session.liveTickets,
+          model: state.modelInfo(),
+        });
         return;
       }
 
@@ -311,7 +374,29 @@ async function main(): Promise<void> {
 
   server.listen(PORT, HOST, () => {
     console.log(`James local UI running at http://${HOST}:${PORT}`);
-    console.log(`Connected to local model "${state.runtime.modelId}" at ${state.runtime.baseUrl}`);
+    if (state.runtime?.fallbackFromLocal) {
+      const pin = state.runtime.openRouterProvider
+        ? ` (pinned to ${state.runtime.openRouterProvider})`
+        : "";
+      console.log(
+        `Local API not reachable — fell back to OpenRouter model "${state.runtime.modelId}"${pin} at ${state.runtime.baseUrl}`,
+      );
+    } else if (state.runtime?.isOpenRouter) {
+      const pin = state.runtime.openRouterProvider
+        ? ` (pinned to ${state.runtime.openRouterProvider})`
+        : "";
+      console.log(
+        `Connected to OpenRouter model "${state.runtime.modelId}"${pin} at ${state.runtime.baseUrl}`,
+      );
+    } else if (state.runtime) {
+      console.log(
+        `Connected to local model "${state.runtime.modelId}" at ${state.runtime.baseUrl}`,
+      );
+    } else {
+      console.warn(
+        `Started in read-only mode (no local model or OpenRouter fallback available): ${state.runtimeError}`,
+      );
+    }
   });
 }
 
