@@ -1,0 +1,4 @@
+node_modules/
+trace.json
+tests/custom-trace.json
+.env

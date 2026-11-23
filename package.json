@@ -1,0 +1,17 @@
+{
+  "name": "james-support-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "James - Offline AI Support Agent for #deep-thought-support built with Pi Agent",
+  "scripts": {
+    "james": "node src/cli.ts james-challenge.json",
+    "test:custom": "node tests/run-tests.ts",
+    "ui": "node src/server.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "^1.6.0",
+    "@earendil-works/pi-ai": "^1.6.0",
+    "@earendil-works/pi-schema": "^1.6.0"
+  }
+}
