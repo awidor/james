@@ -53,10 +53,11 @@ export class JamesSession {
   }
 
   private allocateTicketId(type: TicketType): string {
-    if (type === "service_request") {
-      return `SR-${this.nextSrNumber++}`;
-    }
-    return `INC-${this.nextIncNumber++}`;
+    let id: string;
+    do {
+      id = type === "service_request" ? `SR-${this.nextSrNumber++}` : `INC-${this.nextIncNumber++}`;
+    } while (this.liveTickets.some((t) => t.id === id));
+    return id;
   }
 
   private formatRecentHistory(): string {
