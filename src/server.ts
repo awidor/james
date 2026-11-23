@@ -13,6 +13,15 @@ import type {
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = "127.0.0.1";
+const FRONTEND_DIR = path.resolve("frontend");
+const STATIC_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
+  ".txt": "text/plain; charset=utf-8",
+};
 
 interface UiEntry {
   message: ChannelMessage;
@@ -197,6 +206,7 @@ class LocalDemoState {
       modelId: this.runtime.modelId,
       baseUrl: this.runtime.baseUrl,
       rules: NEVER_BREAK_RULES,
+      messages: this.challenge.messages,
       entries: this.entries,
       tickets: this.session.liveTickets,
     };
@@ -221,20 +231,39 @@ async function readJsonBody(req: IncomingMessage): Promise<Record<string, unknow
   return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 }
 
+async function serveStatic(pathname: string, res: ServerResponse): Promise<boolean> {
+  let rel: string;
+  try {
+    rel = pathname === "/" ? "index.html" : decodeURIComponent(pathname.slice(1));
+  } catch {
+    return false;
+  }
+  const filePath = path.resolve(FRONTEND_DIR, rel);
+  const type = STATIC_TYPES[path.extname(filePath).toLowerCase()];
+  if (!type || !filePath.startsWith(FRONTEND_DIR + path.sep)) return false;
+  try {
+    const data = await readFile(filePath);
+    res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-cache" });
+    res.end(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main(): Promise<void> {
   const state = new LocalDemoState();
   await state.init();
-
-  const htmlPath = path.resolve("frontend/index.html");
 
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", `http://${HOST}:${PORT}`);
 
-      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
-        const html = await readFile(htmlPath, "utf8");
-        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-        res.end(html);
+      if (
+        req.method === "GET" &&
+        !url.pathname.startsWith("/api/") &&
+        (await serveStatic(url.pathname, res))
+      ) {
         return;
       }
 

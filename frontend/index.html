@@ -2,635 +2,125 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>James / #deep-thought-support</title>
-<style>
-:root {
-  --bg: #eef2f7;
-  --surface: #ffffff;
-  --navy: #0f1e59;
-  --ink: #16224a;
-  --text: #273454;
-  --muted: #607094;
-  --line: #dde3ee;
-  --blue: #0078bb;
-  --blue-soft: #e7f3fb;
-  --red: #cb0002;
-  --red-soft: #fbeaea;
-  --green: #147a4c;
-  --green-soft: #e6f6ee;
-  --amber: #a86400;
-  --amber-soft: #fff5e0;
-  --purple: #6039a8;
-  --purple-soft: #f2ecfc;
-  --gray-soft: #edf0f6;
-  --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
-  --sans: "Segoe UI", system-ui, -apple-system, sans-serif;
-}
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-body {
-  font-family: var(--sans);
-  background: var(--bg);
-  color: var(--text);
-  display: flex;
-  flex-direction: column;
-}
-.shell {
-  max-width: 1360px;
-  width: 100%;
-  margin: 16px auto;
-  flex: 1;
-  min-height: 0;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 12px 32px rgba(15, 30, 89, 0.08);
-}
-header {
-  background: var(--navy);
-  color: #fff;
-  padding: 14px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-bottom: 3px solid var(--red);
-  flex-wrap: wrap;
-}
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand h1 { margin: 0; font-size: 1.08rem; font-weight: 700; letter-spacing: 0.01em; }
-.brand span { opacity: 0.72; font-weight: 400; }
-.head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.status-pill {
-  font-size: 0.78rem;
-  font-family: var(--mono);
-  background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.22);
-  padding: 4px 10px;
-  border-radius: 999px;
-}
-.btn-ghost {
-  background: rgba(255,255,255,0.12);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.25);
-  border-radius: 7px;
-  padding: 6px 11px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-ghost:hover { background: rgba(255,255,255,0.22); }
-.btn-ghost:disabled { opacity: 0.5; cursor: wait; }
-
-.workspace {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
-}
-@media (max-width: 900px) {
-  .shell { margin: 0; border-radius: 0; }
-  .workspace { grid-template-columns: 1fr; }
-}
-
-/* Left chat column */
-.chat-col {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-right: 1px solid var(--line);
-}
-.feed {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.exchange {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  scroll-margin-top: 16px;
-}
-.row {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 0.78rem;
-  background: #e3e8f2;
-  color: var(--navy);
-  user-select: none;
-}
-.avatar.james { background: var(--red); color: #fff; }
-.avatar.ext { background: var(--red-soft); color: var(--red); }
-.avatar.sys { border-radius: 8px; background: var(--blue-soft); color: var(--blue); }
-
-.meta {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 4px;
-  font-size: 0.82rem;
-}
-.meta b { color: var(--ink); font-size: 0.88rem; }
-.meta .role { color: var(--muted); }
-.meta .time { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
-.meta .msgid { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-left: auto; }
-
-.bubble {
-  background: #f5f7fb;
-  border: 1px solid #e5eaf3;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.93rem;
-  line-height: 1.48;
-  word-break: break-word;
-}
-.bubble.james {
-  background: var(--blue-soft);
-  border-color: #c7e2f4;
-}
-.bubble.silent {
-  background: #f8f9fc;
-  border-style: dashed;
-  color: var(--muted);
-  font-style: italic;
-}
-.bubble.sys { font-family: var(--mono); font-size: 0.85rem; }
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 7px;
-  align-items: center;
-}
-.pill {
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.pill.answer { background: var(--green-soft); color: var(--green); }
-.pill.ask { background: var(--purple-soft); color: var(--purple); }
-.pill.ticket { background: var(--red-soft); color: var(--red); }
-.pill.update_ticket { background: var(--blue-soft); color: var(--blue); }
-.pill.handover { background: var(--amber-soft); color: var(--amber); }
-.pill.ignore { background: var(--gray-soft); color: var(--muted); }
-.pill.reason {
-  background: #f3f5fa;
-  color: var(--text);
-  font-weight: 400;
-  border: 1px solid var(--line);
-}
-.trace-toggle {
-  margin-top: 6px;
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-.trace-toggle summary { cursor: pointer; user-select: none; font-weight: 600; color: var(--blue); }
-.trace-list {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  list-style: none;
-  background: #0d1636;
-  color: #dbe3f8;
-  border-radius: 8px;
-  font-family: var(--mono);
-  font-size: 0.73rem;
-  display: grid;
-  gap: 4px;
-}
-.trace-list li.guard_block { color: #ff9c9e; }
-.trace-list li.tool_ok { color: #84e6b4; }
-.trace-list li.pre_guard { color: #8fd2f8; }
-
-/* Live composer */
-.composer {
-  border-top: 1px solid var(--line);
-  background: #f8fafd;
-  padding: 12px 16px;
-  display: grid;
-  gap: 8px;
-}
-.composer-meta {
-  display: grid;
-  grid-template-columns: 1fr 1fr 120px;
-  gap: 8px;
-}
-@media (max-width: 640px) {
-  .composer-meta { grid-template-columns: 1fr; }
-}
-.composer input {
-  font: inherit;
-  font-size: 0.86rem;
-  padding: 8px 11px;
-  border: 1px solid #cfd8e8;
-  border-radius: 8px;
-  background: #fff;
-  color: var(--ink);
-}
-.composer input:focus { outline: 2px solid var(--blue); border-color: var(--blue); }
-.composer-send {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-.btn-send {
-  background: var(--blue);
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  padding: 9px 18px;
-  font-weight: 700;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-.btn-send:hover { background: #006299; }
-.btn-send:disabled { opacity: 0.55; cursor: wait; }
-
-/* Right sidebar */
-.side-col {
-  overflow-y: auto;
-  padding: 18px;
-  background: #fafbfd;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.side-section h2 {
-  margin: 0 0 10px;
-  font-size: 0.74rem;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.stack { display: flex; flex-direction: column; gap: 10px; }
-.ticket-card {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--blue);
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: grid;
-  gap: 5px;
-}
-.ticket-card.known { border-left-color: #eab308; }
-.ticket-card.sr { border-left-color: var(--purple); }
-.ticket-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.ticket-id { font-family: var(--mono); font-size: 0.78rem; font-weight: 700; color: var(--muted); }
-.prio {
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 5px;
-  background: var(--navy);
-  color: #fff;
-}
-.prio.P1 { background: var(--red); }
-.prio.P2 { background: #d95d00; }
-.prio.P3 { background: var(--navy); }
-.prio.P4 { background: var(--blue); }
-.ticket-title { font-weight: 700; color: var(--ink); font-size: 0.9rem; }
-.ticket-desc { font-size: 0.82rem; color: var(--text); line-height: 1.4; }
-.ticket-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin-top: 2px;
-}
-.ticket-updates {
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--line);
-  font-size: 0.77rem;
-  color: var(--muted);
-  display: grid;
-  gap: 4px;
-}
-.log-item {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 9px 12px;
-  cursor: pointer;
-  display: grid;
-  gap: 4px;
-}
-.log-item:hover { border-color: var(--blue); }
-.log-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.76rem;
-  font-family: var(--mono);
-  color: var(--muted);
-}
-.log-reason { font-size: 0.82rem; color: var(--ink); line-height: 1.35; }
-.rules-box {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 0.8rem;
-}
-.rules-box summary { cursor: pointer; font-weight: 700; color: var(--ink); }
-.rules-box ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--text); }
-.spinner {
-  font-size: 0.84rem;
-  color: var(--blue);
-  font-weight: 600;
-  padding: 6px 2px;
-}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>James · #deep-thought-support</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/mona-sans-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/martian-mono-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  (function () {
+    var theme = null;
+    try { theme = localStorage.getItem("james-theme"); } catch (e) {}
+    if (theme !== "light" && theme !== "dark") {
+      theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    document.documentElement.dataset.theme = theme;
+  })();
+</script>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="shell">
-  <header>
+<div class="app" id="app" data-sheet="closed">
+  <header class="topbar">
     <div class="brand">
-      <h1>James <span>/ #deep-thought-support</span></h1>
+      <span class="james james-lg" id="brand-james" data-mood="idle" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect class="james-head" x="2" y="5" width="28" height="22" rx="9"/><rect class="james-eye" x="10.5" y="12" width="3.6" height="8" rx="1.8"/><rect class="james-eye" x="17.9" y="12" width="3.6" height="8" rx="1.8"/></svg>
+      </span>
+      <h1 class="wordmark">James</h1>
+      <span class="channel-chip" id="channel-chip">#deep-thought-support</span>
+      <span class="company" id="company"></span>
     </div>
-    <div class="head-right">
-      <span id="status-pill" class="status-pill">connecting...</span>
-      <button id="btn-replay" class="btn-ghost" title="Re-run James live on all 8 messages">Re-run 8</button>
-      <button id="btn-reset" class="btn-ghost" title="Reset chat back to james-challenge.json baseline">Reset</button>
+
+    <div class="topbar-actions">
+      <span class="model" id="model" hidden>
+        <span class="model-dot" aria-hidden="true"></span>
+        <span class="model-kind" id="model-kind"></span>
+        <span class="model-id" id="model-id"></span>
+      </span>
+      <span class="pop-anchor">
+        <button class="btn" id="btn-replay" type="button" aria-haspopup="dialog" aria-label="Re-run all messages">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13.2 2.6v2.9h-2.9"/></svg>
+          <span class="btn-label" id="btn-replay-label">Re-run all</span>
+        </button>
+      </span>
+      <span class="pop-anchor">
+        <button class="btn btn-quiet" id="btn-reset" type="button" aria-haspopup="dialog" aria-label="Reset">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8a5 5 0 1 0 1.6-3.7"/><path d="M2.8 2.6v2.9h2.9"/></svg>
+          <span class="btn-label">Reset</span>
+        </button>
+      </span>
+      <button class="btn btn-icon btn-quiet only-narrow" id="btn-sheet" type="button" aria-label="Open details">
+        <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="3" width="11" height="10" rx="2"/><path d="M9.5 3v10"/></svg>
+      </button>
+      <button class="btn btn-icon btn-quiet" id="btn-theme" type="button" aria-label="Switch theme">
+        <svg class="i theme-sun" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.7"/><path d="M8 1.8v1.4M8 12.8v1.4M1.8 8h1.4M12.8 8h1.4M3.6 3.6l1 1M11.4 11.4l1 1M3.6 12.4l1-1M11.4 4.6l1-1"/></svg>
+        <svg class="i theme-moon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.2 9.6A5.6 5.6 0 1 1 6.4 2.8a4.6 4.6 0 0 0 6.8 6.8z"/></svg>
+      </button>
     </div>
   </header>
 
-  <div class="workspace">
-    <div class="chat-col">
-      <div id="feed" class="feed"></div>
-      <form id="composer" class="composer">
-        <div class="composer-meta">
-          <input id="in-from" type="text" value="Alex Weber" placeholder="Sender name" aria-label="Sender name">
-          <input id="in-role" type="text" value="Finance" placeholder="Role / Department" aria-label="Role">
-          <input id="in-time" type="text" value="Mon 10:30" placeholder="Day HH:MM" aria-label="Timestamp">
+  <main class="workspace">
+    <section class="channel" aria-label="Channel">
+      <div class="legend" id="legend" role="group" aria-label="Highlight messages by action"></div>
+
+      <div class="feed" id="feed">
+        <ol class="rail" id="rail" aria-label="Messages and James's decisions"></ol>
+      </div>
+
+      <form class="composer" id="composer" autocomplete="off">
+        <div class="composer-who">
+          <div class="persona" id="persona" role="group" aria-label="Sender type">
+            <span class="persona-thumb" aria-hidden="true"></span>
+            <button type="button" data-persona="internal" aria-pressed="true">Employee</button>
+            <button type="button" data-persona="external" aria-pressed="false">External</button>
+            <button type="button" data-persona="system" aria-pressed="false">System</button>
+          </div>
+          <label class="field field-from">
+            <span class="field-label label">From</span>
+            <input id="in-from" type="text" value="Alex Weber" spellcheck="false">
+          </label>
+          <label class="field field-role">
+            <span class="field-label label">Role</span>
+            <input id="in-role" type="text" value="Finance" spellcheck="false">
+          </label>
+          <label class="field field-time">
+            <span class="field-label label">Time</span>
+            <input id="in-time" type="text" value="Mon 10:30" spellcheck="false" aria-describedby="time-hint">
+            <span class="time-hint" id="time-hint"></span>
+          </label>
         </div>
-        <div class="composer-send">
-          <input id="in-text" type="text" placeholder="Type a new message to test James live..." autocomplete="off" required>
-          <button id="btn-send" class="btn-send" type="submit">Send</button>
+        <div class="composer-write">
+          <textarea id="in-text" rows="1" placeholder="Write a message to the channel…" aria-label="Message" required></textarea>
+          <span class="composer-key" aria-hidden="true">Enter to send</span>
+          <button class="send" id="btn-send" type="submit" aria-label="Send message">
+            <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 12.8V3.4"/><path d="M3.8 7.4 8 3.2l4.2 4.2"/></svg>
+          </button>
         </div>
       </form>
-    </div>
+    </section>
 
-    <aside class="side-col">
-      <div class="side-section">
-        <h2>ITSM Tickets (<span id="ticket-count">0</span>)</h2>
-        <div id="tickets" class="stack"></div>
+    <div class="scrim" id="scrim"></div>
+
+    <aside class="panel" id="panel" aria-label="Details">
+      <div class="panel-head">
+        <div class="tabs" id="tabs" role="tablist" style="--tab: 0">
+          <span class="tabs-thumb" aria-hidden="true"></span>
+          <button type="button" role="tab" id="tab-decision" data-tab="decision" aria-selected="true" aria-controls="panel-body">Decision</button>
+          <button type="button" role="tab" id="tab-tickets" data-tab="tickets" aria-selected="false" aria-controls="panel-body">Tickets <span class="tab-count" id="count-tickets"></span></button>
+          <button type="button" role="tab" id="tab-rules" data-tab="rules" aria-selected="false" aria-controls="panel-body">Rules <span class="tab-count" id="count-rules"></span></button>
+        </div>
+        <button class="btn btn-icon btn-quiet only-narrow" id="btn-sheet-close" type="button" aria-label="Close details">
+          <svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
       </div>
-
-      <div class="side-section">
-        <h2>Decision Log</h2>
-        <div id="decision-log" class="stack"></div>
-      </div>
-
-      <details class="rules-box">
-        <summary>5 Unbreakable Rules (src/rules.ts)</summary>
-        <ol id="rules-list"></ol>
-      </details>
+      <div class="panel-body" id="panel-body" role="tabpanel" tabindex="-1"></div>
     </aside>
-  </div>
+  </main>
 </div>
 
-<script>
-const $ = (id) => document.getElementById(id);
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-function initials(name) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "?";
-}
-
-function esc(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function senderKind(msg) {
-  const role = (msg.role || "").toLowerCase();
-  const from = (msg.from || "").toLowerCase();
-  if (role === "system") return "sys";
-  if (role === "unknown" || role === "external" || from.includes("external") || from.startsWith("guest")) return "ext";
-  return "";
-}
-
-function renderEntry(entry) {
-  const { message, decision, trace, createdTicketId, updatedTicketId, durationMs } = entry;
-  const kind = senderKind(message);
-  const actionLabel = decision.ticket
-    ? `${decision.action} ${decision.ticket.priority}${createdTicketId ? " · " + createdTicketId : updatedTicketId ? " · " + updatedTicketId : ""}`
-    : decision.action;
-
-  const replyHtml = decision.reply
-    ? `<div class="bubble james">${esc(decision.reply)}</div>`
-    : `<div class="bubble silent">${
-        decision.action === "ignore"
-          ? "No channel reply (ignored)."
-          : "No channel reply (silent action)."
-      }</div>`;
-
-  const traceHtml =
-    Array.isArray(trace) && trace.length > 0
-      ? `<details class="trace-toggle">
-           <summary>Pi Agent trace (${trace.length} events${durationMs != null ? ` · ${(durationMs / 1000).toFixed(1)}s` : ""})</summary>
-           <ul class="trace-list">
-             ${trace.map((t) => `<li class="${esc(t.kind)}">[${esc(t.kind)}] ${esc(t.detail)}</li>`).join("")}
-           </ul>
-         </details>`
-      : "";
-
-  return `
-    <div class="exchange" id="msg-${message.id}">
-      <div class="row">
-        <div class="avatar ${kind}">${esc(initials(message.from))}</div>
-        <div>
-          <div class="meta">
-            <b>${esc(message.from)}</b>
-            <span class="role">${esc(message.role)}</span>
-            <span class="time">${esc(message.time)}</span>
-            <span class="msgid">#${message.id}</span>
-          </div>
-          <div class="bubble ${kind}">${esc(message.text)}</div>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="avatar james">J</div>
-        <div>
-          <div class="meta">
-            <b>James</b>
-            <span class="role">bot · Pi Agent</span>
-            <span class="time">${esc(message.time)}</span>
-          </div>
-          ${replyHtml}
-          <div class="chips">
-            <span class="pill ${esc(decision.action)}">${esc(actionLabel)}</span>
-            <span class="pill reason">${esc(decision.reason)}</span>
-          </div>
-          ${traceHtml}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderTickets(tickets) {
-  $("ticket-count").textContent = String(tickets.length);
-  $("tickets").innerHTML = tickets
-    .map((t) => {
-      const cls = t.source === "known" ? "known" : t.type === "service_request" ? "sr" : "";
-      const links = t.links && t.links.length ? `<span>links: ${esc(t.links.join(", "))}</span>` : "";
-      const updates =
-        t.updates && t.updates.length
-          ? `<div class="ticket-updates">${t.updates
-              .map((u) => `<div>+ [${esc(u.time)}] <b>${esc(u.requester)}:</b> ${esc(u.note)}</div>`)
-              .join("")}</div>`
-          : "";
-      return `
-        <div class="ticket-card ${cls}">
-          <div class="ticket-top">
-            <span class="ticket-id">${esc(t.id)} · ${t.source === "known" ? "known" : "created by James"}</span>
-            <span class="prio ${esc(t.priority)}">${esc(t.priority)}</span>
-          </div>
-          <div class="ticket-title">${esc(t.title)}</div>
-          <div class="ticket-desc">${esc(t.status)}</div>
-          <div class="ticket-foot">
-            <span>${esc(t.type)}</span>
-            ${t.requester ? `<span>requester: ${esc(t.requester)}</span>` : `<span>opened ${esc(t.created)}</span>`}
-            ${links}
-          </div>
-          ${updates}
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function renderDecisionLog(entries) {
-  $("decision-log").innerHTML = entries
-    .map(
-      ({ message, decision }) => `
-      <div class="log-item" onclick="document.getElementById('msg-${message.id}')?.scrollIntoView({behavior:'smooth'})">
-        <div class="log-top">
-          <span>msg #${message.id} · ${esc(message.from)}</span>
-          <span class="pill ${esc(decision.action)}">${esc(decision.action)}</span>
-        </div>
-        <div class="log-reason">${esc(decision.reason)}</div>
-      </div>
-    `,
-    )
-    .join("");
-}
-
-function renderState(data) {
-  $("status-pill").textContent = `offline · ${data.modelId}`;
-  $("feed").innerHTML = data.entries.map(renderEntry).join("");
-  renderTickets(data.tickets);
-  renderDecisionLog(data.entries);
-  $("rules-list").innerHTML = (data.rules || []).map((r) => `<li>${esc(r)}</li>`).join("");
-}
-
-async function loadState() {
-  const res = await fetch("/api/state");
-  const data = await res.json();
-  renderState(data);
-}
-
-$("composer").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = $("in-text").value.trim();
-  if (!text) return;
-
-  const btn = $("btn-send");
-  btn.disabled = true;
-  const pending = document.createElement("div");
-  pending.className = "spinner";
-  pending.textContent = "James (Pi Agent) is thinking locally...";
-  $("feed").appendChild(pending);
-  $("feed").scrollTop = $("feed").scrollHeight;
-
-  try {
-    const res = await fetch("/api/decide", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: $("in-from").value,
-        role: $("in-role").value,
-        time: $("in-time").value,
-        text,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Request failed");
-
-    pending.remove();
-    $("feed").insertAdjacentHTML("beforeend", renderEntry(data.entry));
-    renderTickets(data.tickets);
-    const stateRes = await fetch("/api/state");
-    const full = await stateRes.json();
-    renderDecisionLog(full.entries);
-    $("in-text").value = "";
-    $("feed").scrollTop = $("feed").scrollHeight;
-  } catch (err) {
-    pending.textContent = `Error: ${err.message}`;
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-$("btn-reset").addEventListener("click", async () => {
-  $("btn-reset").disabled = true;
-  try {
-    const res = await fetch("/api/reset", { method: "POST" });
-    renderState(await res.json());
-  } finally {
-    $("btn-reset").disabled = false;
-  }
-});
-
-$("btn-replay").addEventListener("click", async () => {
-  $("btn-replay").disabled = true;
-  $("btn-reset").disabled = true;
-  $("feed").innerHTML = `<div class="spinner">Re-running James live on all 8 messages...</div>`;
-  try {
-    const res = await fetch("/api/replay", { method: "POST" });
-    renderState(await res.json());
-  } finally {
-    $("btn-replay").disabled = false;
-    $("btn-reset").disabled = false;
-  }
-});
-
-loadState();
-</script>
+<script src="app.js" defer></script>
 </body>
 </html>

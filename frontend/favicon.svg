@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .head { fill: #14161a; }
+    .eye { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .head { fill: #eeeff1; }
+      .eye { fill: #0c0d0f; }
+    }
+  </style>
+  <rect class="head" x="2" y="5" width="28" height="22" rx="9"/>
+  <rect class="eye" x="10.5" y="12" width="3.6" height="8" rx="1.8"/>
+  <rect class="eye" x="17.9" y="12" width="3.6" height="8" rx="1.8"/>
+</svg>

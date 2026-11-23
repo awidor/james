@@ -25,7 +25,15 @@ node tests/run-tests.ts
 node src/server.ts
 ```
 
-Then open `http://127.0.0.1:3000` in your browser to inspect the `#deep-thought-support` chat, tickets, Pi Agent traces, and send new live messages to James.
+Then open `http://127.0.0.1:3000` in your browser. The UI is plain HTML/CSS/JS with fonts bundled in `frontend/fonts`, so it needs no build step and no internet.
+
+What happens when you click:
+
+- **A message in the channel** selects it and opens its decision on the right: the action, the reason, the code pre-checks (service hours, sender, injection scan), the Pi Agent trace with tool arguments and any guardrail rejections, the ticket payload, and the `actions.json` entry.
+- **An action in the legend** (Answer, Ask, Ticket, Update ticket, Handover, Ignore) highlights the messages James handled that way.
+- **A ticket ID** jumps to that ticket in the Tickets tab, which lists every ticket with its updates and the messages that caused them. The Rules tab shows the rules from `src/rules.ts` plus the service hours, priorities, and knowledge base James works from.
+- **Send** posts a new message as any sender, role, and time; James decides live on the local model.
+- **Re-run all** replays the challenge messages live and overwrites `actions.json` and `trace.json`. **Reset** drops live messages and reloads the saved run.
 
 ## Five Rules James Never Breaks
 
@@ -49,5 +57,5 @@ I used an AI coding assistant to plan the architecture, scaffold the Pi Agent to
 - `src/tools.ts` — Pi `AgentTool`s (`lookup_kb`, `list_tickets`, `check_service_hours`, and the 6 decision tools).
 - `src/agent.ts` — `JamesSession` managing Pi Agent turns, rolling channel history, and the live ITSM ticket store.
 - `src/cli.ts` — CLI entrypoint (`james-challenge.json` → `actions.json`).
-- `src/server.ts` + `frontend/index.html` — Optional local web UI with live chat composer, ticket board, decision log, and Pi tool/guardrail traces.
+- `src/server.ts` + `frontend/` — Optional local web UI (`index.html`, `styles.css`, `app.js`, bundled fonts): channel timeline with live composer, decision inspector with pre-checks and Pi tool/guardrail traces, ticket board, and rules.
 - `tests/` + `test-messages.md` — 3 custom test messages and failure analysis.
